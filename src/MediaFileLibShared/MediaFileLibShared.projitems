@@ -1,0 +1,26 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <PropertyGroup>
+    <MSBuildAllProjects>$(MSBuildAllProjects);$(MSBuildThisFileFullPath)</MSBuildAllProjects>
+    <HasSharedItems>true</HasSharedItems>
+    <SharedGUID>f14b1853-801e-4ff6-ae8d-5fac63c933d3</SharedGUID>
+  </PropertyGroup>
+  <PropertyGroup Label="Configuration">
+    <Import_RootNamespace>KsWare.MediaFileLib.Shared</Import_RootNamespace>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="$(MSBuildThisFileDirectory)FileInfoExtension.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)FileName.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)FileNameComparer.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)FileUtils.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)GenericComparer.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)GroupType.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)IProcessPlugin.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)MediaFileInfo.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)MediaFileInfoExtension.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)MediaFileName.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)NearestTimeComparer.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)ProcessPriority.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)RegExUtils.cs" />
+  </ItemGroup>
+</Project>
