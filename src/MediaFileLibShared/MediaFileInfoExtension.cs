@@ -1,7 +1,9 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Diagnostics.Contracts;
 using System.IO;
 using System.Text;
+using JetBrains.Annotations;
 
 namespace KsWare.MediaFileLib.Shared
 {
@@ -21,21 +23,56 @@ namespace KsWare.MediaFileLib.Shared
 			return true;
 		}
 
-		public static bool RenameDependencyExtension(this MediaFileInfo mediaFile, string extension)
+		public static void RenameDependencyExtension([NotNull] this MediaFileInfo mediaFile, [NotNull] string extension,
+			[CanBeNull] string extensionFolder, bool moveToExtensionFolder, out bool extensionFound)
 		{
-			var fileName= Path.Combine(mediaFile.OldFile.DirectoryName, $"{mediaFile.OldFile.NameWithoutExtension()}{extension}");
-			if (!File.Exists(fileName)) return false;
-			var newName = $"{mediaFile.OriginalFile.NameWithoutExtension()}{extension}";
-			return FileUtils.RenameWithLog(fileName, newName);
+			Contract.Requires(mediaFile != null);
+			Contract.Requires(!string.IsNullOrEmpty(extension));
+
+			var fileName = Path.Combine(mediaFile.OldFile.DirectoryName, $"{mediaFile.OldFile.NameWithoutExtension()}{extension}");
+			if (File.Exists(fileName))
+			{
+				extensionFound = true;
+				if (!string.IsNullOrEmpty(extensionFolder) && moveToExtensionFolder)
+				{
+					var newName = Path.Combine(mediaFile.OldFile.DirectoryName, extensionFolder, $"{mediaFile.OriginalFile.NameWithoutExtension()}{extension}");
+					FileUtils.TryMoveWithLog(fileName, newName);
+					return;
+				}
+				else
+				{
+					var newName = $"{mediaFile.OriginalFile.NameWithoutExtension()}{extension}";
+					FileUtils.TryRenameWithLog(fileName, newName);
+					return;
+				}
+			}
+
+			if (string.IsNullOrEmpty(extensionFolder))
+			{
+				extensionFound = false;
+				return;
+			}
+			fileName = Path.Combine(mediaFile.OldFile.DirectoryName, extensionFolder, $"{mediaFile.OldFile.NameWithoutExtension()}{extension}");
+			if (File.Exists(fileName))
+			{
+				extensionFound = true;
+				var newName = $"{mediaFile.OriginalFile.NameWithoutExtension()}{extension}";
+				FileUtils.TryRenameWithLog(fileName, newName);
+			}
+			else
+			{
+				extensionFound = false;
+				return;
+			}
 		}
 
-		public static bool RenameDependencyRawExtension(this MediaFileInfo mediaFile, IEnumerable<string> rawExtensions)
+		public static void RenameDependencyRawExtension(this MediaFileInfo mediaFile, IEnumerable<string> rawExtensions, string rawFolder = "RAW", bool moveToRawFolder = false)
 		{
 			foreach (var ext in rawExtensions)
 			{
-				if(RenameDependencyExtension(mediaFile, ext)) return true;
+				RenameDependencyExtension(mediaFile, ext, rawFolder, moveToRawFolder, out var found);
+				if(found) return;
 			}
-			return false;
 		}
 	}
 }

@@ -121,7 +121,7 @@ namespace KsWare.MediaFileLib.Shared
 			if (IsRenamed) return false;
 			OldFile = OriginalFile;
 			OriginalFile = new FileInfo(CreateUniqueFileName());
-			if (!FileUtils.RenameWithLog(OldFile.FullName, OriginalFile.FullName)) return false;
+			if (!FileUtils.TryRenameWithLog(OldFile.FullName, OriginalFile.FullName)) return false;
 
 			IsRenamed = true;
 			return true;

@@ -6,7 +6,6 @@ using System.IO;
 using System.Linq;
 using System.Text;
 using System.Text.RegularExpressions;
-using System.Xml.Serialization;
 using JetBrains.Annotations;
 using Microsoft.WindowsAPICodePack.Shell;
 using Microsoft.WindowsAPICodePack.Shell.PropertySystem;
@@ -629,28 +628,29 @@ namespace KsWare.MediaFileLib.Shared
 			return baseName;
 		}
 
-		public static bool RenameWithLog(string fileName, string newFileName)
+		public static bool TryRenameWithLog(string fileName, string newFileName)
 		{
+			const bool failed = false;
 			var directory = Path.GetDirectoryName(fileName);
 			var oldName = Path.GetFileName(fileName);
 			var newName = Path.GetFileName(newFileName);
 
 			var file = new FileInfo(Path.Combine(directory, oldName));
-			if (!file.Exists) return false;
+			if (!file.Exists) return failed;
 			if (newFileName.Contains(":") || newFileName.Contains(@"\\"))
 			{
 				// full path
 				if (!Path.GetDirectoryName(fileName).Equals(directory,StringComparison.OrdinalIgnoreCase))
 				{
 					DirectoryLog(fileName, $"Rename failed. Directory can not be changed! NewName: \"{newFileName}\"");
-					throw new InvalidOperationException("Directory can not be changed!");
+					return failed;
 				}
 			}
 			else if(newFileName.Contains(@"\"))
 			{
 				// relative path
 				DirectoryLog(fileName, $"Rename failed. Directory can not be changed! NewName: \"{newFileName}\"");
-				throw new InvalidOperationException("Directory can not be changed!");
+				return failed;
 			}
 			else
 			{
@@ -663,7 +663,7 @@ namespace KsWare.MediaFileLib.Shared
 			{
 				// throw new InvalidOperationException("File already exists!");
 				DirectoryLog(newFile.FullName, "Rename failed. File already exist!");
-				return false;
+				return failed;
 			}
 
 			try
@@ -673,7 +673,7 @@ namespace KsWare.MediaFileLib.Shared
 			catch (Exception ex)
 			{
 				DirectoryLog(fileName, $"Rename failed. Exception: {ex.Message}");
-				return false;
+				return failed;
 			}
 
 			#region rename.log
@@ -694,6 +694,79 @@ namespace KsWare.MediaFileLib.Shared
 			{
 				using (var log = new StreamWriter(File.Open(Path.Combine(directory, "~rename-revert.cmd"),FileMode.Append, FileAccess.Write, FileShare.None), GetOemEncoding()))
 					log.WriteLine($"move \"{newName}\" \"{oldName}\"");
+			}
+			catch (Exception ex)
+			{
+				using (var log = new StreamWriter(File.Open(Path.Combine(directory, "~rename-revert-{DateTime.Now:yyyyMMddHHmmssfff}.cmd"), FileMode.Append, FileAccess.Write, FileShare.None), GetOemEncoding()))
+					log.WriteLine($"move \"{newName}\" \"{oldName}\"");
+			}
+			#endregion
+
+			return true;
+		}
+
+		public static bool TryMoveWithLog(string fileName, string newFileName)
+		{
+			const bool failed = false;
+			var directory = Path.GetDirectoryName(fileName);
+			var oldName = Path.GetFileName(fileName);
+			var newName = Path.GetFileName(newFileName);
+
+			var file = new FileInfo(fileName);
+			if (!file.Exists) return failed;
+			
+			if (newFileName.Contains(":") || newFileName.Contains(@"\\"))
+			{ // full path
+			}
+			else if (newFileName.Contains(@"\"))
+			{ // relative path
+				newFileName = Path.Combine(directory, newFileName);
+			}
+			else
+			{ // no path
+				newFileName = Path.Combine(directory, newFileName);
+			}
+
+			var newFile = new FileInfo(newFileName);
+			if (newFile.Exists)
+			{
+				// throw new InvalidOperationException("File already exists!");
+				DirectoryLog(newFile.FullName, "Move failed. File already exist!");
+				return failed;
+			}
+
+			try
+			{
+				File.Move(fileName, newFileName);
+			}
+			catch (Exception ex)
+			{
+				DirectoryLog(fileName, $"Rename failed. Exception: {ex.Message}");
+				return failed;
+			}
+
+			#region rename.log
+
+			var msg = $"move \"{oldName}\" => \"{newName}\"";
+			try
+			{
+				using (var log = File.AppendText(Path.Combine(directory, "~rename.log")))
+					log.WriteLine(msg);
+			}
+			catch (Exception ex)
+			{
+				using (var log = File.AppendText(Path.Combine(directory, $"~rename-{DateTime.Now:yyyyMMddHHmmssfff}.log")))
+					log.WriteLine($"\"{oldName}\" => \"{newName}\"");
+			}
+			#endregion
+
+			#region ~rename-revert.cmd
+
+			msg = $"move \"{newName}\" \"{oldName}\"";
+			try
+			{
+				using (var log = new StreamWriter(File.Open(Path.Combine(directory, "~rename-revert.cmd"), FileMode.Append, FileAccess.Write, FileShare.None), GetOemEncoding()))
+					log.WriteLine(msg);
 			}
 			catch (Exception ex)
 			{
