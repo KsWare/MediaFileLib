@@ -1,8 +1,8 @@
-﻿namespace KsWare.MediaFileLib.Shared
-{
-	public enum GroupType
-	{
+﻿namespace KsWare.MediaFileLib.Shared {
+
+	public enum GroupType {
 		None,
 		ExposureValue
 	}
+
 }

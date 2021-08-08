@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.Diagnostics.CodeAnalysis;
 using System.Globalization;
 using System.IO;
 using System.Linq;
@@ -12,60 +13,60 @@ using Microsoft.WindowsAPICodePack.Shell.PropertySystem;
 using static KsWare.MediaFileLib.Shared.RegExUtils;
 
 
-namespace KsWare.MediaFileLib.Shared
-{
-	public static class FileUtils
-	{
+namespace KsWare.MediaFileLib.Shared {
+
+	public static class FileUtils {
+
+		[SuppressMessage("ReSharper", "InconsistentNaming")]
+		private static readonly IFormatProvider enUS = new CultureInfo("en-US");
+
 		// 20190426_132443_HDR			DCIM\Camera
 		// DSC_0001_1					DCIM\100ANDRO
 		// FB_IMG_1552644499266			DCIM\Facebook
 		// IMG_20190503_183708_2.png	DCIM\OpenCamera
 		//
 
-		private static readonly string[] ExifFileExtensions = {".jpg", ".jpeg", ".tif", ".tiff"};
-		private static readonly string[] MovieFileExtensions = { ".mov", ".mp4" };
-		private static readonly string[] ImageFileExtension =
-		{
+		private static readonly string[] ExifFileExtensions = {".jpg", ".jpeg", ".tif", ".tiff", ".dng"};
+		private static readonly string[] MovieFileExtensions = {".mov", ".mp4"};
+
+		private static readonly string[] ImageFileExtension = {
 			".jpg", ".jpeg", // exif
-			".tif", ".tiff", //exif
+			".tif", ".tiff", // exif
 			".png",
 			".bmp",
 //			".emf",
 //			".gif",
 //			".ico",
 //			".wmf",
+			".dng"			// exif
 		};
 
 		public static DirectoryScanOptions DefaultDirectoryScanOptions = new DirectoryScanOptions();
 
-		public static bool IsExifExtension(string fileName)
-		{
+		public static bool IsExifExtension(string fileName) {
 			var ext = fileName.StartsWith(".") ? fileName : Path.GetExtension(fileName);
 
 			return ExifFileExtensions.Contains(ext, StringComparer.OrdinalIgnoreCase);
 		}
 
-		public static bool IsMovie(string fileName)
-		{
+		public static bool IsMovie(string fileName) {
 			var ext = fileName.StartsWith(".") ? fileName : Path.GetExtension(fileName);
 			return MovieFileExtensions.Contains(ext, StringComparer.OrdinalIgnoreCase);
 		}
-		public static bool IsImage(string fileName)
-		{
+
+		public static bool IsImage(string fileName) {
 			var ext = fileName.StartsWith(".") ? fileName : Path.GetExtension(fileName);
-			return ImageFileExtension.Contains(ext,StringComparer.OrdinalIgnoreCase);
+			return ImageFileExtension.Contains(ext, StringComparer.OrdinalIgnoreCase);
 		}
 
 		public static void ScanDirectoryRecursive(object directory, ref List<string> files,
-			DirectoryScanOptions options = null)
-		{
+			DirectoryScanOptions options = null) {
 			if (options == null) options = DefaultDirectoryScanOptions;
-			var d = directory is DirectoryInfo info ? info : new DirectoryInfo((string)directory);
+			var d = directory is DirectoryInfo info ? info : new DirectoryInfo((string) directory);
 
 
 			files.AddRange(Directory.GetFiles(d.FullName));
-			foreach (var sub in d.EnumerateDirectories())
-			{
+			foreach (var sub in d.EnumerateDirectories()) {
 				// ignore junctions
 				if (options.IncludeReparsePoint || (sub.Attributes & FileAttributes.ReparsePoint) != 0) continue;
 
@@ -80,18 +81,32 @@ namespace KsWare.MediaFileLib.Shared
 			}
 		}
 
-		public static void OpenInExplorer(string path)
-		{
+		public static void OpenInExplorer(string path) {
 			string cmd = "explorer.exe";
 			string arg = "/select, " + path;
 			Process.Start(cmd, arg);
 		}
 
-		public static DateTime? GetDateTakenOrAlternative([NotNull] string fileName)
-		{
+		public static DateTime? GetDateTakenOrAlternative([NotNull] string fileName) {
 			if (string.IsNullOrWhiteSpace(fileName)) throw new ArgumentNullException(nameof(fileName));
-			if (IsImage(fileName))
-			{
+			if (IsImage(fileName)) {
+				{
+					//TODO special naming
+					if (Regex.IsMatch(Path.GetFileName(fileName), @"^IMG_(19|2\d)\d{6}_\d{6}")) {
+						var timestamp = GetTimestampFromFileName(fileName);
+						if (timestamp.HasValue) return timestamp.Value;
+					}
+
+					if (Regex.IsMatch(Path.GetFileName(fileName), @"^(19|2\d)\d\d-\d\d-\d\d\s\d{6}")) {
+						var timestamp = GetTimestampFromFileName(fileName);
+						if (timestamp.HasValue) return timestamp.Value;
+					}
+
+					if (Regex.IsMatch(Path.GetFileName(fileName), @"^(cameringo_)?(19|2\d)\d{6}_\d{6}")) {
+						var timestamp = GetTimestampFromFileName(fileName);
+						if (timestamp.HasValue) return timestamp.Value;
+					}
+				}
 				{
 					var dateTaken = GetDateTaken(fileName);
 					if (dateTaken.HasValue) return dateTaken.Value;
@@ -108,8 +123,7 @@ namespace KsWare.MediaFileLib.Shared
 				// return File.GetLastWriteTime(fileName);
 				return null;
 			}
-			else if (IsMovie(fileName))
-			{
+			else if (IsMovie(fileName)) {
 				var d = GetDate(fileName, p => p.System.ItemDate); // also DateAcquired
 				if (d.HasValue) return d.Value;
 
@@ -118,12 +132,10 @@ namespace KsWare.MediaFileLib.Shared
 				return null;
 			}
 
-
 			return null;
 		}
 
-		public static bool TryFindFile(string directory, string baseName, string suffix, string ext, out string fileName)
-		{
+		public static bool TryFindFile(string directory, string baseName, string suffix, string ext, out string fileName) {
 			// "base file" is the file w/ the baseName and w/o a suffix.
 			if (string.IsNullOrEmpty(directory)) throw new ArgumentNullException(nameof(directory));
 			if (string.IsNullOrEmpty(baseName)) throw new ArgumentNullException(nameof(baseName));
@@ -134,8 +146,7 @@ namespace KsWare.MediaFileLib.Shared
 			var baseFiles = Directory.GetFiles(directory, $"{baseName}{suffix}{ext}")
 				.ToArray();
 
-			if (baseFiles.Length == 1)
-			{
+			if (baseFiles.Length == 1) {
 				fileName = baseFiles[0];
 				return true;
 			}
@@ -143,14 +154,12 @@ namespace KsWare.MediaFileLib.Shared
 			// ..{DSC_0123}...ext
 			baseFiles = Directory.GetFiles(directory, $"*{{{baseName}}}{suffix}{ext}")
 				.ToArray();
-			if (baseFiles.Length == 1)
-			{
+			if (baseFiles.Length == 1) {
 				fileName = baseFiles[0];
 				return true;
 			}
 
-			if (baseFiles.Length > 1)
-			{
+			if (baseFiles.Length > 1) {
 				Debug.WriteLine($"File not unique, using first. Base: {baseName} "); //TODO
 				fileName = baseFiles[0];
 				return true;
@@ -163,30 +172,25 @@ namespace KsWare.MediaFileLib.Shared
 
 		public static bool TryGetBaseFile(string fileName, out string baseFile) =>
 			TryGetBaseFile(fileName, null, out baseFile);
-		public static bool TryGetBaseFile(string fileName, [CanBeNull] string baseName, out string baseFile)
-		{
+
+		public static bool TryGetBaseFile(string fileName, [CanBeNull] string baseName, out string baseFile) {
 			// "base file" is the file w/ the baseName and w/o a suffix.
-			if(string.IsNullOrEmpty(fileName)) throw new ArgumentNullException(nameof(fileName));
+			if (string.IsNullOrEmpty(fileName)) throw new ArgumentNullException(nameof(fileName));
 
 			baseFile = null;
-			if (baseName == null)
-			{
-				if(MediaFileName.TryParse(fileName, out var mediaFileName))
-				{
-					if (string.IsNullOrEmpty(mediaFileName.Suffix))
-					{
+			if (baseName == null) {
+				if (MediaFileName.TryParse(fileName, out var mediaFileName)) {
+					if (string.IsNullOrEmpty(mediaFileName.Suffix)) {
 						return false;
 					}
-					else
-					{
+					else {
 						baseName = mediaFileName.BaseName.Trim('{', '}');
 					}
 				}
-				else
-				{
+				else {
 					SplitName(fileName, out baseName, out _);
 				}
-				
+
 			}
 
 			var name = Path.GetFileName(fileName);
@@ -195,17 +199,16 @@ namespace KsWare.MediaFileLib.Shared
 
 			// DSC_0123.ext
 			var baseFiles = Directory.GetFiles(directory, baseName + ext)
-				.Where(f => !Path.GetFileName(f).Equals(name, StringComparison.InvariantCultureIgnoreCase)) // exclude self
+				.Where(f => !Path.GetFileName(f)
+					.Equals(name, StringComparison.InvariantCultureIgnoreCase)) // exclude self
 				.ToArray();
 
-			if (baseFiles.Length == 1)
-			{
+			if (baseFiles.Length == 1) {
 				baseFile = baseFiles[0];
 				return true;
 			}
 
-			if (baseFiles.Length > 1)
-			{
+			if (baseFiles.Length > 1) {
 				Debug.WriteLine($"{fileName} Base file not unique, using first.)"); //TODO
 				baseFile = baseFiles[0];
 				return true;
@@ -213,34 +216,32 @@ namespace KsWare.MediaFileLib.Shared
 
 			// ..{DSC_0123}...ext
 			baseFiles = Directory.GetFiles(directory, $"*{{{baseName}}}{ext}")
-				.Where(f => !Path.GetFileName(f).Equals(name, StringComparison.InvariantCultureIgnoreCase)) // exclude self
+				.Where(f => !Path.GetFileName(f)
+					.Equals(name, StringComparison.InvariantCultureIgnoreCase)) // exclude self
 				.ToArray();
-			if (baseFiles.Length == 1)
-			{
+			if (baseFiles.Length == 1) {
 				baseFile = baseFiles[0];
 				return true;
 			}
 
-			if (baseFiles.Length > 1)
-			{
-				Debug.WriteLine($"{fileName} Base file not unique, using first.)");//TODO
+			if (baseFiles.Length > 1) {
+				Debug.WriteLine($"{fileName} Base file not unique, using first.)"); //TODO
 				baseFile = baseFiles[0];
 				return true;
 			}
 
 			// DSC_0123.*
 			baseFiles = Directory.GetFiles(directory, baseName + ".*")
-				.Where(f => !Path.GetFileName(f).Equals(name, StringComparison.InvariantCultureIgnoreCase)) // exclude self
+				.Where(f => !Path.GetFileName(f)
+					.Equals(name, StringComparison.InvariantCultureIgnoreCase)) // exclude self
 				.ToArray();
 
-			if (baseFiles.Length == 1)
-			{
+			if (baseFiles.Length == 1) {
 				baseFile = baseFiles[0];
 				return true;
 			}
 
-			if (baseFiles.Length > 1)
-			{
+			if (baseFiles.Length > 1) {
 				Debug.WriteLine($"{fileName} Base file not unique, using first.)"); //TODO
 				baseFile = baseFiles[0];
 				return true;
@@ -248,16 +249,15 @@ namespace KsWare.MediaFileLib.Shared
 
 			// ..{DSC_0123}...*
 			baseFiles = Directory.GetFiles(directory, $"*{{{baseName}}}.*")
-				.Where(f => !Path.GetFileName(f).Equals(name, StringComparison.InvariantCultureIgnoreCase)) // exclude self
+				.Where(f => !Path.GetFileName(f)
+					.Equals(name, StringComparison.InvariantCultureIgnoreCase)) // exclude self
 				.ToArray();
-			if (baseFiles.Length == 1)
-			{
+			if (baseFiles.Length == 1) {
 				baseFile = baseFiles[0];
 				return true;
 			}
 
-			if (baseFiles.Length > 1)
-			{
+			if (baseFiles.Length > 1) {
 				Debug.WriteLine($"{fileName} Base file not unique, using first.)");
 				baseFile = baseFiles[0];
 				return true;
@@ -268,8 +268,7 @@ namespace KsWare.MediaFileLib.Shared
 			return false;
 		}
 
-		public static DateTime? GetDateTakenFromBase(string fileName)
-		{
+		public static DateTime? GetDateTakenFromBase(string fileName) {
 			if (!SplitName(fileName, out var baseName, out _)) return null;
 			if (!TryGetBaseFile(fileName, baseName, out var baseFile)) return null;
 			return GetDateTaken(baseFile);
@@ -295,35 +294,28 @@ namespace KsWare.MediaFileLib.Shared
 
 		public static DateTime? GetDateTaken([NotNull] string fileName) => GetDate(fileName, p => p.System.ItemDate);
 
-		public static DateTime? GetDateAcquired([NotNull] string fileName)
-		{
-			using (var file = ShellFile.FromFilePath(fileName))
-			{
+		public static DateTime? GetDateAcquired([NotNull] string fileName) {
+			using (var file = ShellFile.FromFilePath(fileName)) {
 				var d = file.Properties.System.ItemDate;
 				return d.Value;
 			}
 		}
 
-		public static DateTime? GetDate(string fileName, Func<ShellProperties, ShellProperty<DateTime?>> selector)
-		{
-			using (var file = ShellFile.FromFilePath(fileName))
-			{
+		public static DateTime? GetDate(string fileName, Func<ShellProperties, ShellProperty<DateTime?>> selector) {
+			using (var file = ShellFile.FromFilePath(fileName)) {
 				var d = selector(file.Properties);
 				return d.Value;
 			}
 		}
 
-		private static DateTime? GetTimestampFromFileName(string fileName)
-		{
-			var patterns = new[]
-			{
-				// 20180921_181653  2018-09-09_17_36_10
-				@"(?<yyyy>20\d{2})[^0-9]?(?<MM>\d{2})[^0-9]?(?<dd>\d{2})[^0-9]?(?<HH>\d{2})[^0-9]?(?<mm>\d{2})[^0-9]?(?<ss>\d{2})[^0-9]?(?<f>\d{0,3})",
+		public static DateTime? GetTimestampFromFileName(string fileName) {
+			var expressions = new[] {
+				// 2018*09*21*18*16*53*123
+				new Regex(@"(?<yyyy>(19|2\d)\d{2})[^0-9]?(?<MM>\d{2})[^0-9]?(?<dd>\d{2})[^0-9]?(?<HH>\d{2})[^0-9]?(?<mm>\d{2})[^0-9]?(?<ss>\d{2})[^0-9]?(?<f>\d{0,3})",RegexOptions.Compiled|RegexOptions.CultureInvariant|RegexOptions.ExplicitCapture|RegexOptions.IgnoreCase|RegexOptions.IgnorePatternWhitespace)
 			};
 
-			foreach (var pattern in patterns)
-			{
-				var match = Regex.Match(Path.GetFileNameWithoutExtension(fileName), pattern);
+			foreach (var regex in expressions) {
+				var match = regex.Match(Path.GetFileNameWithoutExtension(fileName));
 				if (!match.Success) continue;
 
 				if (!int.TryParse(match.Groups["yyyy"].Value, NumberStyles.Integer, null, out var year)) year = 0;
@@ -359,35 +351,27 @@ namespace KsWare.MediaFileLib.Shared
 //			return result;
 //		}
 
-		public static object GetValue(string fileName, Func<ShellProperties, IShellProperty> selector)
-		{
-			using (var file = ShellFile.FromFilePath(fileName))
-			{
-				try
-				{
+		public static object GetValue(string fileName, Func<ShellProperties, IShellProperty> selector) {
+			using (var file = ShellFile.FromFilePath(fileName)) {
+				try {
 					var d = selector(file.Properties);
 					return d.ValueAsObject;
 				}
-				catch (Exception ex)
-				{
+				catch (Exception ex) {
 					Debug.WriteLine($"ERROR GetValue => {ex.Message}");
 					return null;
 				}
 			}
 		}
 
-		public static double? GetDouble(string fileName, Func<ShellProperties, IShellProperty> selector)
-		{
-			using (var file = ShellFile.FromFilePath(fileName))
-			{
-				try
-				{
+		public static double? GetDouble(string fileName, Func<ShellProperties, IShellProperty> selector) {
+			using (var file = ShellFile.FromFilePath(fileName)) {
+				try {
 					var d = selector(file.Properties);
 					if (d.ValueAsObject == null) return null;
-					return (double)Convert.ChangeType(d.ValueAsObject,typeof(double));
+					return (double) Convert.ChangeType(d.ValueAsObject, typeof(double));
 				}
-				catch (Exception ex)
-				{
+				catch (Exception ex) {
 					Debug.WriteLine($"ERROR GetValue => {ex.Message}");
 					return null;
 				}
@@ -395,24 +379,35 @@ namespace KsWare.MediaFileLib.Shared
 		}
 
 		//https://stackoverflow.com/questions/5337683/how-to-set-extended-file-properties
-		public static float GetExposureBias(string file)
-		{
+		public static float GetExposureBias(string file) {
 			var v = GetValue(file, p => p.System.Photo.ExposureBias);
-			return v == null ? 0f : (float)((double) v);
+			return v == null ? 0f : (float) ((double) v);
 		}
 
-		public static bool TryGetExposureBias(string file, out float exposureBias)
-		{
+		public static bool TryGetExposureBias(string file, out float exposureBias) {
 			exposureBias = 0f;
 			var v = GetValue(file, p => p.System.Photo.ExposureBias);
 			if (v == null) return false;
-			exposureBias = (float)((double)v);
+			exposureBias = (float) ((double) v);
 			return true;
 		}
 
+		public static bool TryGetBrightness(string file, out float brightness) {
+			brightness = float.MaxValue;
+			var v = GetValue(file, p => p.System.Photo.Brightness);
+			if (v == null) return false;
+			brightness = (float) ((double) v);
+			return true;
+		}
 
-		public static string AddOffset(string originalName, int value)
-		{
+		public static double? GetBrightness(string file) {
+			var v = GetValue(file, p => p.System.Photo.Brightness);
+			if (v == null) return null;
+			var brightness = (float) ((double) v);
+			return brightness;
+		}
+
+		public static string AddOffset(string originalName, int value) {
 			var match = Regex.Match(originalName, @"^(?<prefix>.*?)(?<counter>\d+)$");
 			if (!match.Success) return null;
 			var counter = int.Parse(match.Groups["counter"].Value);
@@ -425,18 +420,18 @@ namespace KsWare.MediaFileLib.Shared
 		}
 
 
-		public static bool SplitName(string fileName, out string baseName, out string suffix)
-		{
-			if(IsNormalizedName(fileName)) throw new ArgumentException("Name is already normaliezed!",nameof(fileName));
+		public static bool SplitName(string fileName, out string baseName, out string suffix) {
+			if (IsNormalizedName(fileName))
+				throw new ArgumentException("Name is already normalized!", nameof(fileName));
 
 			fileName = Path.GetFileNameWithoutExtension(fileName);
 			var suffixMatch = /*lang=regex*/ @"^(?<basename>.*?)(_?(?<suffix>~.+))$";
-			if (!IsMatch(fileName, suffixMatch, out var match))
-			{
+			if (!IsMatch(fileName, suffixMatch, out var match)) {
 				baseName = Path.GetFileNameWithoutExtension(fileName);
 				suffix = null;
 				return false;
 			}
+
 			baseName = match.Groups["basename"].Value;
 			suffix = match.Groups["suffix"].Value;
 			return true;
@@ -444,75 +439,71 @@ namespace KsWare.MediaFileLib.Shared
 
 		private static bool IsNormalizedName(string fileName) => MediaFileName.TryParse(fileName, out _);
 
-		public static bool TryFindExposureDefaultFile(string refFile, out string exposureDefaultFile)
-		{
+		public static bool TryFindExposureDefaultFile(string refFile, out string exposureDefaultFile) {
 			var sequenceFiles = GroupExposureSequence(refFile).ToArray();
 			if (sequenceFiles.Length == 1) // no sequence
 			{
-				exposureDefaultFile = null; 
+				exposureDefaultFile = null;
 			}
-			else
-			{
+			else {
 				exposureDefaultFile = sequenceFiles
-				.OrderBy(f => f.ExposureValue, new GenericComparer<double?>(CompareNearestDoubleAbsolute))
-				.FirstOrDefault()?.OriginalFile.FullName;
+					.OrderBy(f => f.ExposureValue, new GenericComparer<double?>(CompareNearestDoubleAbsolute))
+					.FirstOrDefault()?.OriginalFile.FullName;
 			}
+
 			return exposureDefaultFile != null;
 		}
 
-		public static bool TryFindExposureDefaultFileOld(string refFile, out string exposureDefaultFile)
-		{
+		public static bool TryFindExposureDefaultFileOld(string refFile, out string exposureDefaultFile) {
 			var mediaFile = new MediaFileInfo(refFile);
 
-			var evv = new[] {"EV0.0±", "EV0.3-", "EV0.3+", "EV0.7-", "EV0.7+", "EV1.0-", "EV1.0+", "EV1.3-", "EV1.3+", "EV1.7-", "EV1.7+", "EV2.0-", "EV2.0+" };
-			
+			var evv = new[] {
+				"EV0.0±", "EV0.3-", "EV0.3+", "EV0.7-", "EV0.7+", "EV1.0-", "EV1.0+", "EV1.3-", "EV1.3+", "EV1.7-",
+				"EV1.7+", "EV2.0-", "EV2.0+"
+			};
+
 
 			// file with same time und EV:0
 			{
 				var t0 = mediaFile.TimestampString;
 				var files = Directory.GetFiles(mediaFile.DirectoryName, $"{t0} EV0.0±*{mediaFile.Extension}");
-				if (files.Length == 1)
-				{
+				if (files.Length == 1) {
 					exposureDefaultFile = files[0];
 					return true;
 				}
+
 				if (files.Length > 1) Debugger.Break();
-				
+
 			}
 
 			// file with time -1s und EV:0
 			{
 				var t0 = mediaFile.Timestamp.AddSeconds(-1).ToString(MediaFileName.TimestampFormat);
 				var files = Directory.GetFiles(mediaFile.DirectoryName, $"{t0} EV0.0±*{mediaFile.Extension}");
-				if (files.Length == 1)
-				{
+				if (files.Length == 1) {
 					exposureDefaultFile = files[0];
 					return true;
 				}
+
 				if (files.Length > 1) Debugger.Break();
 			}
 
 			// match by decremented original name
-			for (int i = 1; i < 8; i++)
-			{
+			for (int i = 1; i < 8; i++) {
 				var baseName = AddOffset(mediaFile.BaseName, -i);
 				var file1 = Path.Combine(mediaFile.DirectoryName, baseName + mediaFile.Extension);
-				if (File.Exists(file1))
-				{
+				if (File.Exists(file1)) {
 					var ev1 = GetExposureBias(file1);
-					if (ev1.Equals(0f))
-					{
+					if (ev1.Equals(0f)) {
 						exposureDefaultFile = file1;
 						return true;
 					}
 				}
 
 				var files2 = Directory.GetFiles(mediaFile.DirectoryName, $"*{{{baseName}}}{mediaFile.Extension}");
-				foreach (var file2 in files2)
-				{
+				foreach (var file2 in files2) {
 					var ev2 = GetExposureBias(file2);
-					if (ev2.Equals(0f))
-					{
+					if (ev2.Equals(0f)) {
 						exposureDefaultFile = file2;
 						return true;
 					}
@@ -524,10 +515,9 @@ namespace KsWare.MediaFileLib.Shared
 			return false;
 		}
 
-		public static int CompareNearestDoubleAbsolute(double? m1, double? m2)
-		{
+		public static int CompareNearestDoubleAbsolute(double? m1, double? m2) {
 			// Sort order: Null  0  -1  +1  +2  -3  ...
-			
+
 			if (!m1.HasValue && !m2.HasValue) return 0;
 			if (!m1.HasValue) return -1;
 			if (!m2.HasValue) return 1;
@@ -538,31 +528,30 @@ namespace KsWare.MediaFileLib.Shared
 			return comp;
 		}
 
-		public static List<MediaFileInfo> GroupExposureSequence(string file)
-		{
-			var refFile=new MediaFileInfo(file);
+		public static List<MediaFileInfo> GroupExposureSequence(string file) {
+			var refFile = new MediaFileInfo(file);
 			var exposureValues = new List<double>();
-			exposureValues.Add(Math.Round(refFile.ExposureValue.Value,1));
+			exposureValues.Add(Math.Round(refFile.ExposureValue.Value, 1));
 
 
 			var filesBefore = GetNeighbors(refFile, -9);
 			var maxGap = 1.0;
-			for (int i = 0; i < filesBefore.Count; i++)
-			{
+			for (int i = 0; i < filesBefore.Count; i++) {
 				var f = filesBefore[i];
 				var ev = Math.Round(f.ExposureValue.Value, 1);
 				maxGap += f.ExposureTime.Value + 0.01;
 				var ca = exposureValues.Contains(ev);
 				var cb = refFile.FocalLength != f.FocalLength || refFile.DigitalZoom != f.DigitalZoom;
-				var cc = Math.Abs(refFile.DateTaken.Value.Subtract(f.DateTaken.Value).TotalSeconds) >= maxGap; 
-				if (ca || cb || cc ) RemoveLeftover(filesBefore,i);
-				else { exposureValues.Add(ev); }
+				var cc = Math.Abs(refFile.DateTaken.Value.Subtract(f.DateTaken.Value).TotalSeconds) >= maxGap;
+				if (ca || cb || cc) RemoveLeftover(filesBefore, i);
+				else {
+					exposureValues.Add(ev);
+				}
 			}
 
-			var filesAfter=GetNeighbors(refFile, 9);
+			var filesAfter = GetNeighbors(refFile, 9);
 			maxGap = 1.0 + refFile.ExposureTime.Value;
-			for (int i = 0; i < filesAfter.Count; i++)
-			{
+			for (int i = 0; i < filesAfter.Count; i++) {
 				var f = filesAfter[i];
 				var ev = Math.Round(f.ExposureValue.Value, 1);
 				maxGap += f.ExposureTime.Value + 0.01;
@@ -570,32 +559,31 @@ namespace KsWare.MediaFileLib.Shared
 				var cb = refFile.FocalLength != f.FocalLength || refFile.DigitalZoom != f.DigitalZoom;
 				var cc = Math.Abs(refFile.DateTaken.Value.Subtract(f.DateTaken.Value).TotalSeconds) >= maxGap;
 				if (ca || cb || cc) RemoveLeftover(filesAfter, i);
-				else { exposureValues.Add(ev); }
+				else {
+					exposureValues.Add(ev);
+				}
 			}
 
-			var list=new List<MediaFileInfo>();
+			var list = new List<MediaFileInfo>();
 			filesBefore.Reverse();
 			list.AddRange(filesBefore);
 			list.Add(refFile);
 			list.AddRange(filesAfter);
 			return list;
 
-			void RemoveLeftover(List<MediaFileInfo> l, int from)
-			{
+			void RemoveLeftover(List<MediaFileInfo> l, int from) {
 				for (int j = from; l.Count > from; j++) l.RemoveAt(from);
 			}
 		}
 
-		public static List<MediaFileInfo> GetNeighbors(MediaFileInfo file, int v)
-		{
+		public static List<MediaFileInfo> GetNeighbors(MediaFileInfo file, int v) {
 			if (string.IsNullOrEmpty(file.BaseName)) throw new ArgumentException();
 			if (!string.IsNullOrEmpty(file.Suffix)) throw new ArgumentException();
 
-			var neighbors=new List<MediaFileInfo>();
-			for (int i = 1; i < Math.Abs(v); i++)
-			{
+			var neighbors = new List<MediaFileInfo>();
+			for (int i = 1; i < Math.Abs(v); i++) {
 				var baseName = AddOffset(file.BaseName, Math.Sign(v) * i);
-				if(baseName==null) break;
+				if (baseName == null) break;
 				if (!TryFindFile(file.DirectoryName, baseName, "", file.Extension, out var baseFile)) break;
 				neighbors.Add(new MediaFileInfo(baseFile));
 			}
@@ -603,17 +591,14 @@ namespace KsWare.MediaFileLib.Shared
 			return neighbors;
 		}
 
-		public static List<MediaFileInfo> GetNeighbors(MediaFileInfo file, int start, int end)
-		{
+		public static List<MediaFileInfo> GetNeighbors(MediaFileInfo file, int start, int end) {
 			if (!string.IsNullOrEmpty(file.Suffix)) throw new ArgumentException();
 
 			var neighbors = new List<MediaFileInfo>();
-			for (int i = start; i <= end; i++)
-			{
-				if(i==0) continue;
+			for (int i = start; i <= end; i++) {
+				if (i == 0) continue;
 				var baseName = AddOffset(file.BaseName, i);
-				if (TryFindFile(file.DirectoryName, baseName, "", file.Extension, out var baseFile))
-				{
+				if (TryFindFile(file.DirectoryName, baseName, "", file.Extension, out var baseFile)) {
 					neighbors.Add(new MediaFileInfo(baseFile));
 				}
 			}
@@ -621,15 +606,13 @@ namespace KsWare.MediaFileLib.Shared
 			return neighbors;
 		}
 
-		public static string GetOriginalName(string fileName)
-		{
+		public static string GetOriginalName(string fileName) {
 			if (MediaFileName.TryParse(fileName, out var f)) return f.BaseName;
 			SplitName(fileName, out var baseName, out _);
 			return baseName;
 		}
 
-		public static bool TryRenameWithLog(string fileName, string newFileName)
-		{
+		public static bool TryRenameWithLog(string fileName, string newFileName, string pluginName) {
 			const bool failed = false;
 			var directory = Path.GetDirectoryName(fileName);
 			var oldName = Path.GetFileName(fileName);
@@ -637,76 +620,77 @@ namespace KsWare.MediaFileLib.Shared
 
 			var file = new FileInfo(Path.Combine(directory, oldName));
 			if (!file.Exists) return failed;
-			if (newFileName.Contains(":") || newFileName.Contains(@"\\"))
-			{
+			if (newFileName.Contains(":") || newFileName.Contains(@"\\")) {
 				// full path
-				if (!Path.GetDirectoryName(fileName).Equals(directory,StringComparison.OrdinalIgnoreCase))
-				{
+				if (!Path.GetDirectoryName(fileName).Equals(directory, StringComparison.OrdinalIgnoreCase)) {
 					DirectoryLog(fileName, $"Rename failed. Directory can not be changed! NewName: \"{newFileName}\"");
 					return failed;
 				}
 			}
-			else if(newFileName.Contains(@"\"))
-			{
+			else if (newFileName.Contains(@"\")) {
 				// relative path
 				DirectoryLog(fileName, $"Rename failed. Directory can not be changed! NewName: \"{newFileName}\"");
 				return failed;
 			}
-			else
-			{
+			else {
 				// no path
 				newFileName = Path.Combine(directory, newFileName);
 			}
 
 			var newFile = new FileInfo(newFileName);
-			if (newFile.Exists)
-			{
+			if (newFile.Exists) {
 				// throw new InvalidOperationException("File already exists!");
 				DirectoryLog(newFile.FullName, "Rename failed. File already exist!");
 				return failed;
 			}
 
-			try
-			{
+			try {
 				File.Move(fileName, newFileName);
 			}
-			catch (Exception ex)
-			{
+			catch (Exception ex) {
 				DirectoryLog(fileName, $"Rename failed. Exception: {ex.Message}");
 				return failed;
 			}
 
 			#region rename.log
-			try
-			{
+
+			var pluginNameString = "";
+			if (!string.IsNullOrWhiteSpace(pluginName)) pluginNameString = $" plugin: \"{pluginName}\"";
+			try {
 				using (var log = File.AppendText(Path.Combine(directory, "~rename.log")))
+					log.WriteLine($"\"{oldName}\" => \"{newName}\"{pluginNameString})");
+			}
+			catch (Exception ex) {
+				using (var log =
+					File.AppendText(Path.Combine(directory, $"~rename-{DateTime.Now:yyyyMMddHHmmssfff}.log")))
 					log.WriteLine($"\"{oldName}\" => \"{newName}\"");
 			}
-			catch (Exception ex)
-			{
-				using (var log = File.AppendText(Path.Combine(directory, $"~rename-{DateTime.Now:yyyyMMddHHmmssfff}.log")))
-					log.WriteLine($"\"{oldName}\" => \"{newName}\"");
-			}
+
 			#endregion
 
 			#region ~rename-revert.cmd
-			try
-			{
-				using (var log = new StreamWriter(File.Open(Path.Combine(directory, "~rename-revert.cmd"),FileMode.Append, FileAccess.Write, FileShare.None), GetOemEncoding()))
+
+			try {
+				using (var log =
+					new StreamWriter(
+						File.Open(Path.Combine(directory, "~rename-revert.cmd"), FileMode.Append, FileAccess.Write,
+							FileShare.None), GetOemEncoding()))
 					log.WriteLine($"move \"{newName}\" \"{oldName}\"");
 			}
-			catch (Exception ex)
-			{
-				using (var log = new StreamWriter(File.Open(Path.Combine(directory, "~rename-revert-{DateTime.Now:yyyyMMddHHmmssfff}.cmd"), FileMode.Append, FileAccess.Write, FileShare.None), GetOemEncoding()))
+			catch (Exception ex) {
+				using (var log =
+					new StreamWriter(
+						File.Open(Path.Combine(directory, "~rename-revert-{DateTime.Now:yyyyMMddHHmmssfff}.cmd"),
+							FileMode.Append, FileAccess.Write, FileShare.None), GetOemEncoding()))
 					log.WriteLine($"move \"{newName}\" \"{oldName}\"");
 			}
+
 			#endregion
 
 			return true;
 		}
 
-		public static bool TryMoveWithLog(string fileName, string newFileName)
-		{
+		public static bool TryMoveWithLog(string fileName, string newFileName) {
 			const bool failed = false;
 			var directory = Path.GetDirectoryName(fileName);
 			var oldName = Path.GetFileName(fileName);
@@ -714,33 +698,31 @@ namespace KsWare.MediaFileLib.Shared
 
 			var file = new FileInfo(fileName);
 			if (!file.Exists) return failed;
-			
-			if (newFileName.Contains(":") || newFileName.Contains(@"\\"))
-			{ // full path
+
+			if (newFileName.Contains(":") || newFileName.Contains(@"\\")) {
+				// full path
 			}
-			else if (newFileName.Contains(@"\"))
-			{ // relative path
+			else if (newFileName.Contains(@"\")) {
+				// relative path
 				newFileName = Path.Combine(directory, newFileName);
 			}
-			else
-			{ // no path
+			else {
+				// no path
 				newFileName = Path.Combine(directory, newFileName);
 			}
 
 			var newFile = new FileInfo(newFileName);
-			if (newFile.Exists)
-			{
+			if (newFile.Exists) {
 				// throw new InvalidOperationException("File already exists!");
 				DirectoryLog(newFile.FullName, "Move failed. File already exist!");
 				return failed;
 			}
 
-			try
-			{
+			try {
+				Directory.CreateDirectory(Path.GetDirectoryName(newFileName));
 				File.Move(fileName, newFileName);
 			}
-			catch (Exception ex)
-			{
+			catch (Exception ex) {
 				DirectoryLog(fileName, $"Rename failed. Exception: {ex.Message}");
 				return failed;
 			}
@@ -748,38 +730,42 @@ namespace KsWare.MediaFileLib.Shared
 			#region rename.log
 
 			var msg = $"move \"{oldName}\" => \"{newName}\"";
-			try
-			{
+			try {
 				using (var log = File.AppendText(Path.Combine(directory, "~rename.log")))
 					log.WriteLine(msg);
 			}
-			catch (Exception ex)
-			{
-				using (var log = File.AppendText(Path.Combine(directory, $"~rename-{DateTime.Now:yyyyMMddHHmmssfff}.log")))
+			catch (Exception ex) {
+				using (var log =
+					File.AppendText(Path.Combine(directory, $"~rename-{DateTime.Now:yyyyMMddHHmmssfff}.log")))
 					log.WriteLine($"\"{oldName}\" => \"{newName}\"");
 			}
+
 			#endregion
 
 			#region ~rename-revert.cmd
 
 			msg = $"move \"{newName}\" \"{oldName}\"";
-			try
-			{
-				using (var log = new StreamWriter(File.Open(Path.Combine(directory, "~rename-revert.cmd"), FileMode.Append, FileAccess.Write, FileShare.None), GetOemEncoding()))
+			try {
+				using (var log =
+					new StreamWriter(
+						File.Open(Path.Combine(directory, "~rename-revert.cmd"), FileMode.Append, FileAccess.Write,
+							FileShare.None), GetOemEncoding()))
 					log.WriteLine(msg);
 			}
-			catch (Exception ex)
-			{
-				using (var log = new StreamWriter(File.Open(Path.Combine(directory, "~rename-revert-{DateTime.Now:yyyyMMddHHmmssfff}.cmd"), FileMode.Append, FileAccess.Write, FileShare.None), GetOemEncoding()))
+			catch (Exception ex) {
+				using (var log =
+					new StreamWriter(
+						File.Open(Path.Combine(directory, "~rename-revert-{DateTime.Now:yyyyMMddHHmmssfff}.cmd"),
+							FileMode.Append, FileAccess.Write, FileShare.None), GetOemEncoding()))
 					log.WriteLine($"move \"{newName}\" \"{oldName}\"");
 			}
+
 			#endregion
 
 			return true;
 		}
 
-		public static Encoding GetOemEncoding()
-		{
+		public static Encoding GetOemEncoding() {
 			int lcid = GetSystemDefaultLCID();
 			var ci = CultureInfo.GetCultureInfo(lcid);
 			var page = ci.TextInfo.OEMCodePage;
@@ -789,26 +775,30 @@ namespace KsWare.MediaFileLib.Shared
 		[System.Runtime.InteropServices.DllImport("kernel32.dll")]
 		public static extern int GetSystemDefaultLCID();
 
-		public static void DirectoryLog(string fileName, string message)
-		{
+		public static void DirectoryLog(string fileName, string message) {
 			var directory = Path.GetDirectoryName(fileName);
 			var name = Path.GetFileName(fileName);
 			var m = $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} {name} {message}";
-			try
-			{
+			try {
 				using (var log = File.AppendText(Path.Combine(directory, "~error.log")))
 					log.WriteLine(m);
 			}
-			catch (Exception ex)
-			{
-				using (var log = File.AppendText(Path.Combine(directory, $"~error-{DateTime.Now:yyyyMMddHHmmssfff}.log")))
+			catch (Exception ex) {
+				using (var log =
+					File.AppendText(Path.Combine(directory, $"~error-{DateTime.Now:yyyyMMddHHmmssfff}.log")))
 					log.WriteLine(m);
 			}
 		}
+
+		public static string ExposureValueToString(double? value) {
+			if (!value.HasValue) return null;
+			if (value.Value < 0) return $"EV{Math.Abs(value.Value).ToString("F1", enUS)}-";
+			if (value.Value > 0) return $"EV{value.Value.ToString("F1", enUS)}+";
+			return $"EV0.0±";
+		}
 	}
 
-	public class DirectoryScanOptions
-	{
+	public class DirectoryScanOptions {
 		public bool IncludeHidden { get; set; }
 		public bool IncludeSystem { get; set; }
 
@@ -816,4 +806,5 @@ namespace KsWare.MediaFileLib.Shared
 
 //		public bool Recursive { get; set; }
 	}
+
 }

@@ -1,15 +1,10 @@
 ﻿using System;
-using System.Diagnostics.CodeAnalysis;
-using System.Globalization;
 using System.IO;
 using JetBrains.Annotations;
 
-namespace KsWare.MediaFileLib.Shared
-{
-	public class MediaFileInfo : MediaFileName
-	{
-		[SuppressMessage("ReSharper", "InconsistentNaming")] 
-		private static readonly IFormatProvider enUS = new CultureInfo("en-US");
+namespace KsWare.MediaFileLib.Shared {
+
+	public class MediaFileInfo : MediaFileName {
 
 		private Lazy<double?> _exposureValue;
 		private Lazy<DateTime?> _dateTaken;
@@ -18,9 +13,9 @@ namespace KsWare.MediaFileLib.Shared
 		private Lazy<double?> _exposureTimeNumerator;
 		private Lazy<double?> _exposureTimeDenominator;
 		private Lazy<double?> _exposureTime;
+		private Lazy<double?> _brightness;
 
-		public MediaFileInfo([NotNull] string fileName)
-		{
+		public MediaFileInfo([NotNull] string fileName) {
 			ParseCore(new FileInfo(fileName), this);
 			InitializeLazyProperties();
 		}
@@ -30,15 +25,13 @@ namespace KsWare.MediaFileLib.Shared
 		/// </summary>
 		/// <param name="fileInfo">The <see cref="FileInfo"/>.</param>
 		/// <param name="authorSign">The authors sign. (<b>NOTE: </b>Does dot overwrite the sign from <paramref name="fileInfo"/>.)</param>
-		public MediaFileInfo([NotNull] FileInfo fileInfo, string authorSign)
-		{
+		public MediaFileInfo([NotNull] FileInfo fileInfo, string authorSign) {
 			ParseCore(fileInfo, this);
-			if(string.IsNullOrEmpty(AuthorSign)) AuthorSign = authorSign;
+			if (string.IsNullOrEmpty(AuthorSign)) AuthorSign = authorSign;
 			InitializeLazyProperties();
 		}
 
-		private void InitializeLazyProperties()
-		{
+		private void InitializeLazyProperties() {
 			_dateTaken = new Lazy<DateTime?>(() => FileUtils.GetDateTaken(OriginalFile.FullName));
 			_focalLength = new Lazy<double?>(() =>
 				FileUtils.GetDouble(OriginalFile.FullName, p => p.System.Photo.FocalLength));
@@ -51,12 +44,16 @@ namespace KsWare.MediaFileLib.Shared
 			_exposureTime = new Lazy<double?>(() =>
 				_exposureTimeNumerator.Value.HasValue && _exposureTimeDenominator.Value.HasValue
 					? _exposureTimeNumerator.Value.Value / _exposureTimeDenominator.Value.Value
-					: (double?)null);
+					: (double?) null);
 			_exposureValue = new Lazy<double?>(() =>
 				FileUtils.GetDouble(OriginalFile.FullName, p => p.System.Photo.ExposureBias));
+			_brightness = new Lazy<double?>(() =>
+				FileUtils.GetDouble(OriginalFile.FullName, p => p.System.Photo.Brightness));
 		}
 
 		public new double? ExposureValue => _exposureValue.Value;
+
+		public new double? Brightness => _brightness.Value;
 
 		public bool IsRenamed { get; set; }
 
@@ -71,44 +68,42 @@ namespace KsWare.MediaFileLib.Shared
 		public DateTime? DateTaken => _dateTaken.Value;
 		public double? FocalLength => _focalLength.Value;
 		public double? DigitalZoom => _digitalZoom.Value;
-		public double? ExposureTimeNumerator => _exposureTimeNumerator.Value;
-		public double? ExposureTimeDenominator => _exposureTimeDenominator.Value;
 		public double? ExposureTime => _exposureTime.Value;
 		public TimeSpan? DiffTime { get; set; }
 
 		public GroupType GroupType { get; set; }
+		public string GroupIndex { get; set; }
 
-		public override string ToString()
-		{
+		public override string ToString() {
 			var baseName = string.IsNullOrEmpty(BaseName) ? "" : $" {{{BaseName}}}";
-			var exposureValue = GroupType==GroupType.ExposureValue ? ExposureValueToString(ExposureValue) : null;
-			var name = Timestamp.ToString(MediaFileName.TimestampFormat) + Counter + exposureValue + " " + AuthorSign + baseName;
+			var groupIndex = string.IsNullOrWhiteSpace(GroupIndex) ? null : GroupIndex;
+			if (groupIndex==null) groupIndex = GroupType == GroupType.ExposureValue ? FileUtils.ExposureValueToString(ExposureValue) : null;
+			if (groupIndex != null) groupIndex = " " + groupIndex;
+
+			var name = Timestamp.ToString(MediaFileName.TimestampFormat) + Counter + groupIndex + " " + AuthorSign +
+			           baseName;
 			if (!string.IsNullOrEmpty(Suffix)) name += Suffix;
-			else if (!name.EndsWith(" ") && !string.IsNullOrEmpty(Suffix) && !Suffix.StartsWith(" ")) name += " "+ Suffix;
+			else if (!name.EndsWith(" ") && !string.IsNullOrEmpty(Suffix) && !Suffix.StartsWith(" "))
+				name += " " + Suffix;
 			else name += Suffix;
 
 			return Path.Combine(DirectoryName, name + Extension);
 		}
 
-		public string CreateUniqueFileName()
-		{
-			while (true)
-			{
+		public string CreateUniqueFileName() {
+			while (true) {
 				if (!Exists) break;
 				if (string.IsNullOrEmpty(Counter)) Counter = "-2";
-				else if (Counter.Length == 4)
-				{
+				else if (Counter.Length == 4) {
 					var c = int.Parse(Counter.Substring(1)) + 1;
 					Counter = $"-{c:D3}";
 				}
-				else
-				{
+				else {
 					var c = int.Parse(Counter.Substring(1)) + 1;
 					Counter = $"-{c}";
 				}
 
-				if (Counter.Length > 4)
-				{
+				if (Counter.Length > 4) {
 					//TODO
 				}
 			}
@@ -116,26 +111,22 @@ namespace KsWare.MediaFileLib.Shared
 			return ToString();
 		}
 
-		public bool Rename()
-		{
+		public bool Rename(string pluginName) {
 			if (IsRenamed) return false;
 			OldFile = OriginalFile;
 			OriginalFile = new FileInfo(CreateUniqueFileName());
-			if (!FileUtils.TryRenameWithLog(OldFile.FullName, OriginalFile.FullName)) return false;
+			if (!FileUtils.TryRenameWithLog(OldFile.FullName, OriginalFile.FullName, pluginName)) return false;
 
 			IsRenamed = true;
 			return true;
 		}
 
-		private static bool ParseCore(FileInfo file, MediaFileInfo f)
-		{
+		private static bool ParseCore(FileInfo file, MediaFileInfo f) {
 			f.OriginalFile = file;
-			if (MediaFileName.ParseCore(file.FullName, f))
-			{
+			if (MediaFileName.ParseCore(file.FullName, f)) {
 				f.IsRenamed = true;
 			}
-			else
-			{
+			else {
 				FileUtils.SplitName(f.OriginalFile.Name, out var baseName, out var suffix);
 				f.BaseName = baseName;
 				f.Suffix = suffix;
@@ -159,13 +150,6 @@ namespace KsWare.MediaFileLib.Shared
 //			mediaFileInfo = ParseCore(fileName, f) ? f : null;
 //			return mediaFileInfo != null;
 //		}
-
-		private string ExposureValueToString(double? value)
-		{
-			if (!value.HasValue) return null;
-			if (value.Value < 0) return $" EV{Math.Abs(value.Value).ToString("F1", enUS)}-";
-			if (value.Value > 0) return $" EV{value.Value.ToString("F1", enUS)}+";
-			return $" EV0.0±";
-		}
 	}
+
 }

@@ -2,10 +2,9 @@
 using System.Collections.Generic;
 using System.Text;
 
-namespace KsWare.MediaFileLib.Shared
-{
-	public enum ProcessPriority
-	{
+namespace KsWare.MediaFileLib.Shared {
+
+	public enum ProcessPriority {
 		None,
 		FullNameMatch,
 		NameMatch,
@@ -14,4 +13,5 @@ namespace KsWare.MediaFileLib.Shared
 		Default //TODO better name for "Default"
 		,
 	}
+
 }
